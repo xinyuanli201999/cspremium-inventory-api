@@ -1,0 +1,229 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+}
+
+enum Unit {
+  PIECE
+  BOX
+  SET
+  PACK
+  CARTON
+  KG
+  OTHER
+}
+
+enum MovementType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+}
+
+enum AuditAction {
+  LOGIN
+  CREATE
+  UPDATE
+  DELETE
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  REORDER
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(STAFF)
+  status       Status   @default(ACTIVE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+  movements     StockMovement[]
+  adjustments   StockAdjustment[]
+  auditLogs     AuditLog[]
+
+  @@index([role, status])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String
+  nameKh      String?
+  slug        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  status      Status   @default(ACTIVE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subcategories Subcategory[]
+  products      Product[]
+
+  @@index([sortOrder])
+}
+
+model Subcategory {
+  id          String   @id @default(uuid())
+  categoryId  String
+  name        String
+  nameKh      String?
+  slug        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  status      Status   @default(ACTIVE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  products Product[]
+
+  @@index([categoryId, sortOrder])
+}
+
+model Supplier {
+  id            String   @id @default(uuid())
+  companyName   String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  note          String?
+  status        Status   @default(ACTIVE)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  products  Product[]
+  movements StockMovement[]
+
+  @@index([companyName])
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  sku           String   @unique
+  name          String
+  nameKh        String?
+  categoryId    String
+  subcategoryId String?
+  supplierId    String?
+  brand         String?
+  purchasePrice Decimal  @default(0) @db.Decimal(12, 2)
+  sellingPrice  Decimal  @default(0) @db.Decimal(12, 2)
+  currentStock  Int      @default(0)
+  minimumStock  Int      @default(0)
+  unit          Unit     @default(PIECE)
+  image         String?
+  description   String?
+  status        Status   @default(ACTIVE)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category    Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subcategory Subcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
+  supplier    Supplier?    @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  movements   StockMovement[]
+  adjustments StockAdjustment[]
+
+  @@index([categoryId, subcategoryId])
+  @@index([supplierId])
+  @@index([name])
+  @@index([status])
+  @@index([currentStock, minimumStock])
+}
+
+model StockMovement {
+  id            String       @id @default(uuid())
+  referenceNo   String       @unique
+  type          MovementType
+  productId     String
+  supplierId    String?
+  quantity      Int // always positive; direction comes from type (adjustments keep the signed value in StockAdjustment.difference)
+  previousStock Int
+  newStock      Int
+  unitCost      Decimal?     @db.Decimal(12, 2)
+  totalCost     Decimal?     @db.Decimal(14, 2)
+  reason        String?
+  party         String? // customer / department for STOCK_OUT
+  note          String?
+  movementDate  DateTime     @default(now())
+  createdById   String
+  createdAt     DateTime     @default(now())
+
+  product    Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  supplier   Supplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  createdBy  User             @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  adjustment StockAdjustment?
+
+  @@index([productId, movementDate])
+  @@index([type, movementDate])
+  @@index([createdById])
+  @@index([supplierId])
+}
+
+model StockAdjustment {
+  id           String   @id @default(uuid())
+  movementId   String   @unique
+  productId    String
+  oldQuantity  Int
+  newQuantity  Int
+  difference   Int
+  reason       String
+  note         String?
+  adjustedById String
+  adjustedAt   DateTime @default(now())
+
+  movement   StockMovement @relation(fields: [movementId], references: [id], onDelete: Restrict)
+  product    Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  adjustedBy User          @relation(fields: [adjustedById], references: [id], onDelete: Restrict)
+
+  @@index([productId, adjustedAt])
+}
+
+model AuditLog {
+  id        String      @id @default(uuid())
+  userId    String?
+  action    AuditAction
+  module    String
+  recordId  String?
+  oldData   Json?
+  newData   Json?
+  ipAddress String?
+  createdAt DateTime    @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([module, createdAt])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
