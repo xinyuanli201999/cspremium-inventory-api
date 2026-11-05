@@ -19,17 +19,7 @@ async function bootstrap() {
   // "Today", monthly grouping and Excel dates follow the business timezone
   process.env.TZ = config.get<string>('app.timezone');
 
-  if (config.get('app.env') === 'production') app.set('trust proxy', 1);
-
-app.enableCors({
-  origin: [
-    'https://cspremium-inventory-frontend.vercel.app/',
-    'http://localhost:5173',
-  ],
-  credentials: true,
-});
-
-await app.listen(process.env.PORT || 3000);
+  if (config.get('app.env') === 'production') app.set('trust proxy', 1);  
 
   app.setGlobalPrefix('api');
   app.use(
