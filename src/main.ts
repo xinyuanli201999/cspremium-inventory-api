@@ -21,6 +21,16 @@ async function bootstrap() {
 
   if (config.get('app.env') === 'production') app.set('trust proxy', 1);
 
+app.enableCors({
+  origin: [
+    'https://cspremium-inventory-frontend.vercel.app/',
+    'http://localhost:5173',
+  ],
+  credentials: true,
+});
+
+await app.listen(process.env.PORT || 3000);
+
   app.setGlobalPrefix('api');
   app.use(
     helmet({
