@@ -95,7 +95,7 @@ export class AuthController {
     return {
       httpOnly: true,
       secure: this.config.get('app.env') === 'production',
-      sameSite: 'lax',
+      sameSite: 'none',
       path: REFRESH_COOKIE_PATH,
     };
   }
