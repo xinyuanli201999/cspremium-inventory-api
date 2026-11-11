@@ -8,7 +8,6 @@ import { AuditAction, Prisma } from '@prisma/client';
 import { ReorderItemsDto } from '../../common/dto/reorder.dto';
 import { Actor } from '../../common/types/auth.types';
 import { toJson } from '../../common/utils/json.util';
-import { slugify } from '../../common/utils/slugify.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import {
@@ -42,7 +41,6 @@ export class CategoriesService {
               OR: [
                 { name: { contains: q.search, mode: 'insensitive' } },
                 { nameKh: { contains: q.search, mode: 'insensitive' } },
-                { slug: { contains: q.search, mode: 'insensitive' } },
               ],
             }
           : {}),
@@ -62,14 +60,11 @@ export class CategoriesService {
   }
 
   async create(dto: CreateCategoryDto, actor: Actor) {
-    const slug = dto.slug ?? slugify(dto.name);
-    if (!slug) throw new BadRequestException('សូមបញ្ចូល slug');
-
     const { _max } = await this.prisma.category.aggregate({
       _max: { sortOrder: true },
     });
     const category = await this.prisma.category.create({
-      data: { ...dto, slug, sortOrder: (_max.sortOrder ?? 0) + 1 },
+      data: { ...dto, sortOrder: (_max.sortOrder ?? 0) + 1 },
     });
     await this.audit.log({
       userId: actor.id,

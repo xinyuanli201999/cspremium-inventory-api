@@ -37,22 +37,23 @@ ok('me', r.json.data.role === 'ADMIN');
 // --- categories
 r = await call('GET', '/categories', { token: admin });
 const cats = r.json.data;
-ok('categories list ordered w/ subcategories', r.status === 200 && cats.length === 4 && cats[0].slug === 'business-solutions' && cats[1].subcategories.length === 6, JSON.stringify(cats.map(c=>c.slug)));
+ok('categories list ordered w/ subcategories', r.status === 200 && cats.length === 4 && cats[0].name === 'Business Solutions' && cats[1].subcategories.length === 6, JSON.stringify(cats.map(c=>c.name)));
 ok('category counts included', cats[1]._count.subcategories === 6);
 r = await call('PATCH', '/categories/reorder', { token: admin, body: { items: [{id: cats[0].id, sortOrder: 4},{id: cats[1].id, sortOrder: 1},{id: cats[2].id, sortOrder: 2},{id: cats[3].id, sortOrder: 3}] } });
-ok('category reorder persisted', r.status === 200 && r.json.data[0].slug === 'customize-gifts' && r.json.data[3].slug === 'business-solutions', JSON.stringify(r.json).slice(0,200));
+ok('category reorder persisted', r.status === 200 && r.json.data[0].name === 'Customize Gifts' && r.json.data[3].name === 'Business Solutions', JSON.stringify(r.json).slice(0,200));
 r = await call('POST', '/categories', { token: admin, body: { name: 'Test Cat', nameKh: '' } });
-ok('create category auto slug', r.status === 201 && r.json.data.slug === 'test-cat' && r.json.data.nameKh === null, JSON.stringify(r.json));
+ok('create category', r.status === 201 && !('slug' in r.json.data) && r.json.data.nameKh === null, JSON.stringify(r.json));
 const testCat = r.json.data;
 r = await call('POST', '/categories', { token: admin, body: { name: 'Test Cat' } });
-ok('duplicate slug -> 409', r.status === 409, JSON.stringify(r.json));
+ok('duplicate category names allowed', r.status === 201, JSON.stringify(r.json));
+const duplicateTestCat = r.json.data;
 r = await call('POST', `/categories/${testCat.id}/subcategories`, { token: admin, body: { name: 'Test Sub' } });
 ok('create subcategory', r.status === 201 && r.json.data.slug === 'test-sub', JSON.stringify(r.json));
 const testSub = r.json.data;
 r = await call('DELETE', `/categories/${testCat.id}`, { token: admin });
 ok('delete category with subcategories -> 409 w/ message', r.status === 409 && /ប្រភេទរង/.test(r.json.message), JSON.stringify(r.json));
 // move subcategory 'bags' (customize-gifts) into test category, next to Test Sub
-const custom = cats.find(c => c.slug === 'customize-gifts');
+const custom = cats.find(c => c.name === 'Customize Gifts');
 const bags = custom.subcategories.find(s => s.slug === 'bags');
 r = await call('PATCH', '/subcategories/reorder', { token: admin, body: { categoryId: testCat.id, items: [{id: bags.id, sortOrder: 1},{id: testSub.id, sortOrder: 2}] } });
 ok('cross-category subcategory move', r.status === 200 && r.json.data[0].id === bags.id && r.json.data[0].categoryId === testCat.id, JSON.stringify(r.json).slice(0,300));
@@ -62,6 +63,7 @@ r = await call('DELETE', `/subcategories/${testSub.id}`, { token: admin });
 ok('delete empty subcategory', r.status === 200);
 r = await call('DELETE', `/categories/${testCat.id}`, { token: admin });
 ok('delete empty category', r.status === 200, JSON.stringify(r.json));
+await call('DELETE', `/categories/${duplicateTestCat.id}`, { token: admin });
 
 // --- suppliers + products
 r = await call('GET', '/suppliers', { token: admin });
@@ -78,7 +80,7 @@ ok('search', r.json.data.length === 1);
 const bagsProduct = (await call('GET', '/products?search=BAG-001', { token: admin })).json.data[0];
 r = await call('POST', '/products', { token: admin, body: { sku: 'BAG-001', name: 'dup', categoryId: custom.id, purchasePrice: 1, sellingPrice: 2, minimumStock: 1, unit: 'PIECE' } });
 ok('duplicate SKU -> 409', r.status === 409, JSON.stringify(r.json));
-const premium = cats.find(c => c.slug === 'premium-gifts');
+const premium = cats.find(c => c.name === 'Premium Gifts');
 r = await call('POST', '/products', { token: admin, body: { sku: 'MISMATCH', name: 'x', categoryId: premium.id, subcategoryId: bags.id, purchasePrice: 1, sellingPrice: 2, minimumStock: 1, unit: 'PIECE' } });
 ok('subcategory must belong to category -> 400', r.status === 400, JSON.stringify(r.json));
 r = await call('POST', '/products', { token: admin, body: { sku: 'NEW-001', name: 'New Item', nameKh: 'ទំនិញថ្មី', categoryId: custom.id, subcategoryId: bags.id, supplierId: supplier.id, purchasePrice: 5, sellingPrice: 9.5, minimumStock: 3, unit: 'BOX', initialStock: 20 } });

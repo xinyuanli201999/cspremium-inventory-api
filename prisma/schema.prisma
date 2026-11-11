@@ -79,7 +79,6 @@ model Category {
   id          String   @id @default(uuid())
   name        String
   nameKh      String?
-  slug        String   @unique
   description String?
   sortOrder   Int      @default(0)
   status      Status   @default(ACTIVE)

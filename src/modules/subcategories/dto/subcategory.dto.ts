@@ -1,15 +1,43 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { Status } from '@prisma/client';
 import {
   ArrayMinSize,
   IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
   IsUUID,
+  Matches,
+  MaxLength,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { ReorderItemDto } from '../../../common/dto/reorder.dto';
-import { CreateCategoryDto } from '../../categories/dto/category.dto';
+import { OptionalString } from '../../../common/decorators/optional-string.decorator';
 
-export class CreateSubcategoryDto extends CreateCategoryDto {}
+const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export class CreateSubcategoryDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString() @MinLength(1) @MaxLength(120)
+  name!: string;
+
+  @OptionalString(120)
+  nameKh?: string | null;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() || undefined : value))
+  @Matches(SLUG_REGEX, { message: 'slug must contain only lowercase letters, numbers, and hyphens' })
+  @MaxLength(120)
+  slug?: string;
+
+  @OptionalString(500)
+  description?: string | null;
+
+  @IsOptional() @IsEnum(Status)
+  status?: Status;
+}
 export class UpdateSubcategoryDto extends PartialType(CreateSubcategoryDto) {}
 
 /**

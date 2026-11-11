@@ -4,13 +4,11 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 const CATEGORIES: {
-  slug: string;
   name: string;
   nameKh?: string;
   subs: { slug: string; name: string }[];
 }[] = [
   {
-    slug: 'business-solutions',
     name: 'Business Solutions',
     nameKh: 'ដំណោះស្រាយអាជីវកម្ម',
     subs: [
@@ -19,7 +17,6 @@ const CATEGORIES: {
     ],
   },
   {
-    slug: 'customize-gifts',
     name: 'Customize Gifts',
     nameKh: 'អំណោយតាមការកំណត់',
     subs: [
@@ -32,7 +29,6 @@ const CATEGORIES: {
     ],
   },
   {
-    slug: 'premium-gifts',
     name: 'Premium Gifts',
     nameKh: 'អំណោយពិសេស',
     subs: [
@@ -44,7 +40,6 @@ const CATEGORIES: {
     ],
   },
   {
-    slug: 'occasional-gifts',
     name: 'Occasional Gifts',
     nameKh: 'អំណោយតាមឱកាស',
     subs: [
@@ -77,11 +72,10 @@ async function seedAdmin() {
 /** Idempotent: existing rows (and any ordering the user changed) are left untouched. */
 async function seedCategories() {
   for (const [ci, c] of CATEGORIES.entries()) {
-    const category = await prisma.category.upsert({
-      where: { slug: c.slug },
-      update: {},
-      create: { slug: c.slug, name: c.name, nameKh: c.nameKh, sortOrder: ci + 1 },
-    });
+    const category = await prisma.category.findFirst({ where: { name: c.name } })
+      ?? await prisma.category.create({
+        data: { name: c.name, nameKh: c.nameKh, sortOrder: ci + 1 },
+      });
     for (const [si, s] of c.subs.entries()) {
       await prisma.subcategory.upsert({
         where: { slug: s.slug },
@@ -108,11 +102,11 @@ async function seedSample(adminId: string) {
       address: 'Phnom Penh',
     },
   });
-  const cat = async (slug: string) =>
-    prisma.category.findUniqueOrThrow({ where: { slug }, include: { subcategories: true } });
+  const cat = async (name: string) =>
+    prisma.category.findFirstOrThrow({ where: { name }, include: { subcategories: true } });
 
-  const custom = await cat('customize-gifts');
-  const premium = await cat('premium-gifts');
+  const custom = await cat('Customize Gifts');
+  const premium = await cat('Premium Gifts');
   const sub = (c: typeof custom, slug: string) => c.subcategories.find((s) => s.slug === slug)?.id;
 
   const items = [
